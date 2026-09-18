@@ -1,7 +1,7 @@
-import { Dashboard } from './components/Dashboard'
+import { StoryExperience } from './components/StoryExperience'
 
 function App() {
-  return <Dashboard />
+  return <StoryExperience />
 }
 
 export default App
