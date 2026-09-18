@@ -189,14 +189,19 @@ function resolveStatus(
   inputAvailable: number,
   outputSpace: number,
 ): MachineStatus {
-  if (outputSpace <= 0) {
+  // BLOCKED: downstream buffer left no space — machine cannot push any output.
+  // Only valid when nothing was processed this tick.
+  if (processed === 0 && outputSpace <= 0) {
     return 'BLOCKED'
   }
-  if (outputSpace < capacity && outputSpace <= inputAvailable) {
-    return 'BLOCKED'
-  }
-  if (id !== 'M1' && inputAvailable < capacity) {
+  // STARVED: upstream supplied less than capacity AND that shortage caused zero output.
+  // A machine that still produced some material is RUNNING (constraint shows in lower util).
+  if (processed === 0 && id !== 'M1' && inputAvailable < capacity) {
     return 'STARVED'
+  }
+  // Secondary BLOCKED: downstream space was the binding constraint and nothing moved.
+  if (processed === 0 && outputSpace < capacity && outputSpace <= inputAvailable) {
+    return 'BLOCKED'
   }
   if (processed > 0) {
     return 'RUNNING'
