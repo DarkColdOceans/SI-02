@@ -1,1 +1,79 @@
 @import "tailwindcss";
+
+/* ─── Keyframes ────────────────────────────────────────────────────────────── */
+
+/* Bottleneck border glow — slow 2s cycle, only border-shadow intensity pulses  */
+@keyframes bn-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25), 0 0 12px 2px rgba(239, 68, 68, 0.15);
+  }
+}
+
+/* Downtime indicator — slower, dimmer red pulse  */
+@keyframes down-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2), 0 0 8px 1px rgba(239, 68, 68, 0.10);
+  }
+}
+
+/* Dot indicator pulse used in status badge and bottleneck panel  */
+@keyframes dot-slow-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+/* Buffer warning — very subtle opacity shimmer when near-full  */
+@keyframes buffer-warn {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.7; }
+}
+
+/* ─── Animation utilities ───────────────────────────────────────────────────── */
+
+@layer utilities {
+  /* Bottleneck card: pulsing outer glow, 2 s period */
+  .animate-bn-pulse {
+    animation: bn-pulse 2s ease-in-out infinite;
+  }
+
+  /* Down card: subtler red glow, 2.5 s period */
+  .animate-down-pulse {
+    animation: down-pulse 2.5s ease-in-out infinite;
+  }
+
+  /* Slow dot pulse for status indicators */
+  .animate-dot-slow {
+    animation: dot-slow-pulse 2s ease-in-out infinite;
+  }
+
+  /* Buffer fill warning shimmer */
+  .animate-buffer-warn {
+    animation: buffer-warn 1.8s ease-in-out infinite;
+  }
+
+  /* Smooth status-driven colour transitions on cards */
+  .status-transition {
+    transition: border-color 0.4s ease, box-shadow 0.4s ease, background-color 0.3s ease;
+  }
+}
+
+/* ─── Reduced-motion override ───────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-bn-pulse,
+  .animate-down-pulse,
+  .animate-dot-slow,
+  .animate-buffer-warn,
+  .animate-pulse {
+    animation: none !important;
+  }
+
+  .status-transition {
+    transition: none !important;
+  }
+}

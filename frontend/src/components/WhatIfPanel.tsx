@@ -1,91 +1,187 @@
 /**
- * WhatIfPanel.tsx
+ * WhatIfPanel.tsx — What-If Scenario UI
  *
- * What-If Scenario panel for the digital-twin dashboard.
- *
- * Renders:
- *  1. Scenario configuration form (machine, type, value)
- *  2. Run / Clear buttons
- *  3. Baseline vs Scenario side-by-side comparison (when result is available)
- *  4. Scenario Impact delta summary
- *
- * Completely isolated from the live simulation — receives liveState +
- * liveHistory as read-only inputs and never writes back to them.
+ * Inputs replaced with HTML range sliders per UX requirement.
+ * All scenario values still flow into scenarioEngine.ts unchanged.
+ * No simulation logic lives here.
  */
 
 import { useEffect, useRef } from 'react'
 import { MACHINE_SPECS } from '../digitalTwin/factoryModel'
-import type { ScenarioResult, ScenarioSnapshot } from '../digitalTwin/scenarioEngine'
+import type { ScenarioSnapshot, ScenarioType } from '../digitalTwin/scenarioEngine'
 import { SCENARIO_WINDOW_MINUTES } from '../digitalTwin/scenarioEngine'
 import type { FactoryState, MachineId } from '../digitalTwin/types'
 import { getBaselineCapacity, useWhatIf } from '../hooks/useWhatIf'
-import type { ScenarioType } from '../digitalTwin/scenarioEngine'
+
+// ─── Slider config ────────────────────────────────────────────────────────────
+
+const CAPACITY_MIN = 20
+const CAPACITY_MAX = 120
+const CAPACITY_STEP = 5
+
+const DOWNTIME_MIN = 1
+const DOWNTIME_MAX = 30
+const DOWNTIME_STEP = 1
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 interface Props {
   liveState: FactoryState
-  /** Rolling history from the live simulation (read-only) */
   liveHistory: FactoryState[]
 }
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
+function fmt(n: number, dec = 0) { return n.toFixed(dec) }
 
-function fmt(n: number, decimals = 0): string {
-  return n.toFixed(decimals)
+function deltaColor(value: number, lowerIsBetter = false) {
+  if (value === 0) return 'text-[#A3A3A3]'
+  const good = lowerIsBetter ? value < 0 : value > 0
+  return good ? 'text-emerald-700' : 'text-[#C62828]'
 }
 
-function deltaClass(value: number, lowerIsBetter = false): string {
-  if (value === 0) return 'text-slate-400'
-  const positive = lowerIsBetter ? value < 0 : value > 0
-  return positive ? 'text-emerald-400' : 'text-red-400'
-}
-
-function deltaSign(value: number): string {
+function deltaSign(value: number) {
   if (value > 0) return '+'
-  if (value < 0) return ''
-  return '±'
+  return ''
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Slider primitive ─────────────────────────────────────────────────────────
 
-function SnapshotColumn({
+function ScenarioSlider({
+  id,
   label,
-  snapshot,
-  accent,
+  min,
+  max,
+  step,
+  value,
+  displayValue,
+  minLabel,
+  maxLabel,
+  onChange,
 }: {
+  id: string
   label: string
-  snapshot: ScenarioSnapshot
-  accent: string
+  min: number
+  max: number
+  step: number
+  value: number
+  displayValue: string
+  minLabel: string
+  maxLabel: string
+  onChange: (v: string) => void
 }) {
-  const bn = snapshot.analysis.line.bottleneck
+  const pct = ((value - min) / (max - min)) * 100
+
   return (
-    <div className="flex flex-col gap-2 flex-1 min-w-0">
-      <div className={`text-[9px] font-bold uppercase tracking-widest ${accent} mb-1`}>
+    <div className="flex flex-col gap-3 w-full">
+      <label htmlFor={id} className="text-xs font-semibold text-[#1F1F1F]">
         {label}
+      </label>
+
+      {/* Slider row with min/max labels inline */}
+      <div className="flex items-center gap-3 w-full">
+        <span className="text-[10px] font-mono text-[#A3A3A3] w-6 text-right flex-shrink-0">
+          {minLabel}
+        </span>
+        
+        {/* Track container */}
+        <div className="relative flex-1 h-6 flex items-center group">
+          {/* filled portion */}
+          <div
+            className="absolute left-0 h-1.5 rounded-full bg-[#C62828] pointer-events-none transition-all duration-75"
+            style={{ width: `${pct}%` }}
+          />
+          {/* unfilled portion */}
+          <div
+            className="absolute right-0 h-1.5 rounded-full bg-[#E5E5E5] pointer-events-none transition-all duration-75"
+            style={{ width: `${100 - pct}%` }}
+          />
+          
+          <input
+            id={id}
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 peer"
+            aria-label={label}
+            aria-valuemin={min}
+            aria-valuemax={max}
+            aria-valuenow={value}
+          />
+          
+          {/* Thumb visual */}
+          <div
+            className="absolute h-4 w-4 rounded-full bg-white border-2 border-[#C62828] shadow-md pointer-events-none transition-[left] duration-75 peer-focus-visible:ring-2 peer-focus-visible:ring-[#C62828] peer-focus-visible:ring-offset-2 group-hover:scale-110 group-active:scale-95"
+            style={{ left: `calc(${pct}% - 8px)` }}
+          />
+        </div>
+
+        <span className="text-[10px] font-mono text-[#A3A3A3] w-6 text-left flex-shrink-0">
+          {maxLabel}
+        </span>
       </div>
-      <MetricRow label="Production" value={`${snapshot.state.totalProduction.toLocaleString()} tabs`} />
-      <MetricRow label="Throughput" value={`${fmt(snapshot.state.throughput)}/min`} />
-      <MetricRow label="WIP" value={`${snapshot.state.wip.toLocaleString()} units`} />
-      <MetricRow label="Utilization" value={`${fmt(snapshot.overallUtilization, 1)}%`} />
-      <MetricRow
-        label="Bottleneck"
-        value={bn ? `${bn.machineId} · ${bn.machineName.split(' ').slice(1).join(' ')}` : '—'}
-      />
+
+      {/* Current value readout directly beneath the slider track */}
+      <div className="text-center mt-[-4px]">
+        <span className="text-xs font-bold font-mono text-[#C62828] bg-red-50 px-2 py-0.5 rounded border border-red-100">
+          {displayValue}
+        </span>
+      </div>
     </div>
   )
 }
 
-function MetricRow({ label, value }: { label: string; value: string }) {
+// ─── Snapshot column ─────────────────────────────────────────────────────────
+
+function SnapshotColumn({
+  label,
+  snapshot,
+  accentText,
+  accentBorder,
+  headerBg,
+}: {
+  label: string
+  snapshot: ScenarioSnapshot
+  accentText: string
+  accentBorder: string
+  headerBg: string
+}) {
+  const bn = snapshot.analysis.line.bottleneck
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[8px] uppercase tracking-widest text-slate-500">{label}</span>
-      <span className="text-[11px] font-mono font-semibold text-slate-200 leading-tight truncate">
-        {value}
+    <div className={`flex flex-col gap-0 rounded border ${accentBorder} bg-white overflow-hidden shadow-sm`}>
+      <div className={`px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest ${accentText} ${headerBg} border-b ${accentBorder}`}>
+        {label}
+      </div>
+      <div className="flex flex-col divide-y divide-[#E5E5E5]">
+        <Row label="Production" value={snapshot.state.totalProduction.toLocaleString()} unit="tabs" />
+        <Row label="Throughput" value={fmt(snapshot.state.throughput)} unit="/min" />
+        <Row label="WIP" value={snapshot.state.wip.toLocaleString()} unit="units" />
+        <Row label="Utilization" value={fmt(snapshot.overallUtilization, 1)} unit="%" />
+        <Row
+          label="Bottleneck"
+          value={bn ? bn.machineId : '—'}
+          unit={bn ? bn.machineName.split(' ').slice(1).join(' ') : ''}
+        />
+      </div>
+    </div>
+  )
+}
+
+function Row({ label, value, unit }: { label: string; value: string; unit: string }) {
+  return (
+    <div className="px-3 py-2 flex flex-col gap-0.5">
+      <span className="text-[8px] uppercase tracking-wider text-[#A3A3A3]">{label}</span>
+      <span className="text-[11px] font-mono font-semibold text-[#1F1F1F] leading-tight">
+        {value}<span className="text-[#666666] ml-0.5 text-[9px]">{unit}</span>
       </span>
     </div>
   )
 }
 
-function DeltaRow({
+// ─── Impact row ──────────────────────────────────────────────────────────────
+
+function ImpactRow({
   label,
   value,
   unit,
@@ -96,13 +192,12 @@ function DeltaRow({
   unit: string
   lowerIsBetter?: boolean
 }) {
-  const cls = deltaClass(value, lowerIsBetter)
-  const sign = deltaSign(value)
+  const cls = deltaColor(value, lowerIsBetter)
   return (
-    <div className="flex items-center justify-between gap-2 py-1 border-b border-slate-800/60 last:border-0">
-      <span className="text-[10px] text-slate-400">{label}</span>
+    <div className="flex items-center justify-between py-1.5 border-b border-[#E5E5E5] last:border-0">
+      <span className="text-[10px] text-[#666666]">{label}</span>
       <span className={`text-[11px] font-mono font-bold tabular-nums ${cls}`}>
-        {sign}{fmt(value)}{unit}
+        {deltaSign(value)}{fmt(value)}{unit}
       </span>
     </div>
   )
@@ -124,16 +219,13 @@ export function WhatIfPanel({ liveState, liveHistory }: Props) {
     clearResult,
   } = useWhatIf()
 
-  // Animate result appearance
+  // Animate result in
   const resultRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (result && resultRef.current) {
       resultRef.current.animate(
-        [
-          { opacity: 0, transform: 'translateY(8px)' },
-          { opacity: 1, transform: 'translateY(0)' },
-        ],
-        { duration: 350, easing: 'ease-out', fill: 'forwards' },
+        [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }],
+        { duration: 300, easing: 'ease-out', fill: 'forwards' },
       )
     }
   }, [result])
@@ -142,205 +234,203 @@ export function WhatIfPanel({ liveState, liveHistory }: Props) {
   const liveMachine = liveState.machines.find((m) => m.id === form.machineId)
   const liveCap = liveMachine?.capacityPerMinute ?? baselineCap
 
-  return (
-    <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 backdrop-blur-sm p-5 flex flex-col gap-5">
+  // Slider numeric values
+  const capacityVal = Math.max(CAPACITY_MIN, Math.min(CAPACITY_MAX, Number(form.newCapacity) || baselineCap))
+  const downtimeVal = Math.max(DOWNTIME_MIN, Math.min(DOWNTIME_MAX, Number(form.downtimeDuration) || 5))
 
-      {/* ── Title ─────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2">
-        <div className="h-2 w-2 rounded-full bg-cyan-500" />
-        <h3 className="text-xs font-bold uppercase tracking-widest text-cyan-300">
+  return (
+    <div className="rounded-lg border border-[#E5E5E5] bg-white p-5 flex flex-col gap-5 shadow-sm">
+
+      {/* Section title */}
+      <div className="flex items-center gap-2 border-b border-[#E5E5E5] pb-3">
+        <div className="h-1.5 w-1.5 rounded-full bg-[#C62828]" />
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#C62828]">
           What-If Scenario
         </h3>
-        <span className="ml-auto text-[9px] text-slate-500 font-mono">
+        <span className="ml-auto text-[9px] font-mono text-[#A3A3A3]">
           +{SCENARIO_WINDOW_MINUTES} sim-min window
         </span>
       </div>
 
-      {/* ── Form ──────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3">
+      {/* Config form */}
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1.4fr] gap-5 items-start">
 
         {/* Machine selector */}
-        <div className="flex flex-col gap-1">
-          <label className="text-[9px] uppercase tracking-widest text-slate-500 font-medium">
-            Machine
-          </label>
-          <select
-            value={form.machineId}
-            onChange={(e) => setMachineId(e.target.value as MachineId)}
-            className="rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-600 transition-colors"
-          >
+        <div className="flex flex-col gap-2">
+          <div className="text-[9px] uppercase tracking-widest text-[#666666] font-semibold">Machine</div>
+          <div className="flex flex-col gap-1">
             {MACHINE_SPECS.map((spec) => (
-              <option key={spec.id} value={spec.id}>
-                {spec.id} · {spec.name.split(' ').slice(1).join(' ')} ({spec.capacityPerMinute}/min)
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Scenario type */}
-        <div className="flex flex-col gap-1">
-          <label className="text-[9px] uppercase tracking-widest text-slate-500 font-medium">
-            Scenario
-          </label>
-          <div className="flex gap-2">
-            {(['capacity', 'downtime'] as ScenarioType[]).map((t) => (
               <button
-                key={t}
-                onClick={() => setScenarioType(t)}
-                className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-all duration-200 ${
-                  form.scenarioType === t
-                    ? 'border-cyan-600 bg-cyan-900/50 text-cyan-200'
-                    : 'border-slate-700 bg-slate-800/40 text-slate-400 hover:border-slate-600 hover:text-slate-300'
+                key={spec.id}
+                onClick={() => setMachineId(spec.id as MachineId)}
+                className={`text-left rounded border px-3 py-1.5 text-xs transition-colors ${
+                  form.machineId === spec.id
+                    ? 'border-[#C62828] bg-red-50 text-[#C62828]'
+                    : 'border-[#E5E5E5] bg-white text-[#666666] hover:border-[#D4D4D4] hover:text-[#1F1F1F]'
                 }`}
               >
-                {t === 'capacity' ? 'Capacity Change' : 'Downtime'}
+                <span className="font-mono font-bold">{spec.id}</span>
+                <span className="text-[#A3A3A3] mx-1">—</span>
+                <span>{spec.name.replace(/^M\d\s+/, '')}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Conditional value input */}
-        {form.scenarioType === 'capacity' ? (
+        {/* Scenario type */}
+        <div className="flex flex-col gap-2">
+          <div className="text-[9px] uppercase tracking-widest text-[#666666] font-semibold">Scenario Type</div>
           <div className="flex flex-col gap-1">
-            <label className="text-[9px] uppercase tracking-widest text-slate-500 font-medium">
-              New Capacity (units/min)
-            </label>
-            <div className="relative">
-              <input
-                type="number"
-                min={1}
-                step={1}
-                value={form.newCapacity}
-                onChange={(e) => setNewCapacity(e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-600 transition-colors font-mono"
-              />
+            {(['capacity', 'downtime'] as ScenarioType[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => setScenarioType(t)}
+                className={`rounded border px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors text-left ${
+                  form.scenarioType === t
+                    ? 'border-[#C62828] bg-red-50 text-[#C62828]'
+                    : 'border-[#E5E5E5] bg-white text-[#666666] hover:border-[#D4D4D4] hover:text-[#1F1F1F]'
+                }`}
+              >
+                {t === 'capacity' ? 'Capacity Change' : 'Machine Downtime'}
+              </button>
+            ))}
+          </div>
+
+          {/* Baseline info */}
+          <div className="mt-1 rounded border border-[#E5E5E5] bg-[#F7F7F7] px-3 py-2">
+            <div className="text-[8px] uppercase tracking-widest text-[#666666] mb-1">
+              {form.machineId} Baseline
             </div>
-            <div className="flex items-center justify-between text-[9px] text-slate-500">
-              <span>Baseline (spec): {baselineCap}/min</span>
-              {liveCap !== baselineCap && (
-                <span className="text-amber-500">Live: {liveCap}/min</span>
+            <div className="text-xs font-mono font-semibold text-[#1F1F1F]">
+              {baselineCap} <span className="text-[#A3A3A3] font-normal">units/min</span>
+            </div>
+            {liveCap !== baselineCap && (
+              <div className="text-[9px] text-amber-600 mt-0.5">Live: {liveCap}/min</div>
+            )}
+          </div>
+        </div>
+
+        {/* Slider + actions */}
+        <div className="flex flex-col gap-4">
+          {form.scenarioType === 'capacity' ? (
+            <ScenarioSlider
+              id="capacity-slider"
+              label="New Capacity"
+              min={CAPACITY_MIN}
+              max={CAPACITY_MAX}
+              step={CAPACITY_STEP}
+              value={capacityVal}
+              displayValue={`${capacityVal} / min`}
+              minLabel={`${CAPACITY_MIN}/min`}
+              maxLabel={`${CAPACITY_MAX}/min`}
+              onChange={setNewCapacity}
+            />
+          ) : (
+            <ScenarioSlider
+              id="downtime-slider"
+              label="Downtime Duration"
+              min={DOWNTIME_MIN}
+              max={DOWNTIME_MAX}
+              step={DOWNTIME_STEP}
+              value={downtimeVal}
+              displayValue={`${downtimeVal} min`}
+              minLabel={`${DOWNTIME_MIN} min`}
+              maxLabel={`${DOWNTIME_MAX} min`}
+              onChange={setDowntimeDuration}
+            />
+          )}
+
+          {/* Error */}
+          {error && (
+            <div className="rounded border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {error}
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => runScenarioAction(liveState, liveHistory)}
+              disabled={isRunning}
+              className="flex-1 rounded border border-transparent bg-[#C62828] py-2.5 text-xs font-bold text-white uppercase tracking-wider transition-colors hover:bg-[#8E1B1B] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            >
+              {isRunning ? '⟳ Running…' : '▶  Run Scenario'}
+            </button>
+            {result && (
+              <button
+                onClick={clearResult}
+                className="rounded border border-[#C62828] bg-white px-4 py-2.5 text-xs font-semibold text-[#C62828] uppercase tracking-wider transition-colors hover:bg-red-50"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+      </div>
+
+      {/* Results */}
+      {result && (
+        <div ref={resultRef} className="flex flex-col gap-4 border-t border-[#E5E5E5] pt-4">
+
+          {/* Label row */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-px bg-[#E5E5E5]" />
+            <span className="text-[9px] uppercase tracking-widest text-[#666666] font-semibold">
+              Results — +{result.windowMinutes} simulated minutes
+            </span>
+            <div className="flex-1 h-px bg-[#E5E5E5]" />
+          </div>
+
+          {/* Baseline vs Scenario columns */}
+          <div className="grid grid-cols-2 gap-3">
+            <SnapshotColumn
+              label="Baseline"
+              snapshot={result.baselineSnapshot}
+              accentText="text-[#666666]"
+              accentBorder="border-[#E5E5E5]"
+              headerBg="bg-[#F7F7F7]"
+            />
+            <SnapshotColumn
+              label="Scenario"
+              snapshot={result.scenarioSnapshot}
+              accentText="text-[#C62828]"
+              accentBorder="border-red-200"
+              headerBg="bg-red-50"
+            />
+          </div>
+
+          {/* Impact summary */}
+          <div className="rounded border border-[#E5E5E5] bg-[#F7F7F7] p-4">
+            <div className="text-[9px] uppercase tracking-widest text-[#666666] font-semibold mb-3">
+              Scenario Impact
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+              <div>
+                <ImpactRow label="Production" value={result.delta.production} unit=" tabs" />
+                <ImpactRow label="Throughput" value={result.delta.throughput} unit="/min" />
+              </div>
+              <div>
+                <ImpactRow label="WIP" value={result.delta.wip} unit=" units" lowerIsBetter />
+                <ImpactRow label="Avg Utilization" value={result.delta.overallUtilization} unit="%" />
+              </div>
+            </div>
+            {/* Bottleneck change */}
+            <div className="flex items-center justify-between pt-2 border-t border-[#E5E5E5] mt-2">
+              <span className="text-[9px] uppercase tracking-widest text-[#666666]">Bottleneck Change</span>
+              {result.delta.bottleneckChanged ? (
+                <span className="text-xs font-mono font-bold text-orange-600">
+                  {result.delta.baselineBnId ?? '—'} → {result.delta.scenarioBnId ?? '—'}
+                </span>
+              ) : (
+                <span className="text-xs font-mono text-[#666666]">
+                  Unchanged ({result.delta.baselineBnId ?? '—'})
+                </span>
               )}
             </div>
           </div>
-        ) : (
-          <div className="flex flex-col gap-1">
-            <label className="text-[9px] uppercase tracking-widest text-slate-500 font-medium">
-              Downtime Duration (sim minutes)
-            </label>
-            <input
-              type="number"
-              min={1}
-              step={1}
-              value={form.downtimeDuration}
-              onChange={(e) => setDowntimeDuration(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-600 transition-colors font-mono"
-            />
-          </div>
-        )}
-
-        {/* Error */}
-        {error && (
-          <div className="rounded-lg border border-red-700/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">
-            {error}
-          </div>
-        )}
-
-        {/* Action buttons */}
-        <div className="flex gap-2">
-          <button
-            onClick={() => runScenarioAction(liveState, liveHistory)}
-            disabled={isRunning}
-            className="flex-1 rounded-lg border border-cyan-700/60 bg-cyan-900/40 px-3 py-2.5 text-xs font-bold text-cyan-200 uppercase tracking-wider transition-all duration-200 hover:bg-cyan-800/60 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
-          >
-            {isRunning ? '⟳ Running…' : '▶ Run Scenario'}
-          </button>
-          {result && (
-            <button
-              onClick={clearResult}
-              className="rounded-lg border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-xs font-semibold text-slate-400 uppercase tracking-wider transition-all duration-200 hover:bg-slate-700/50 active:scale-95"
-            >
-              ✕ Clear
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ── Comparison results ────────────────────────────────────────── */}
-      {result && (
-        <div ref={resultRef} className="flex flex-col gap-4">
-
-          {/* Divider */}
-          <div className="flex items-center gap-2">
-            <div className="flex-1 h-px bg-slate-800" />
-            <span className="text-[9px] uppercase tracking-widest text-slate-600">
-              Results · +{result.windowMinutes} sim-min
-            </span>
-            <div className="flex-1 h-px bg-slate-800" />
-          </div>
-
-          {/* Side-by-side columns */}
-          <ComparisonColumns result={result} />
-
-          {/* Impact table */}
-          <ImpactTable result={result} />
         </div>
       )}
-    </div>
-  )
-}
-
-// ─── Comparison columns ───────────────────────────────────────────────────────
-
-function ComparisonColumns({ result }: { result: ScenarioResult }) {
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      <div className="rounded-xl border border-slate-700/40 bg-slate-800/30 p-3">
-        <SnapshotColumn
-          label="Baseline"
-          snapshot={result.baselineSnapshot}
-          accent="text-slate-400"
-        />
-      </div>
-      <div className="rounded-xl border border-cyan-700/40 bg-cyan-950/20 p-3">
-        <SnapshotColumn
-          label="Scenario"
-          snapshot={result.scenarioSnapshot}
-          accent="text-cyan-400"
-        />
-      </div>
-    </div>
-  )
-}
-
-// ─── Impact table ─────────────────────────────────────────────────────────────
-
-function ImpactTable({ result }: { result: ScenarioResult }) {
-  const { delta } = result
-  const { baselineBnId, scenarioBnId, bottleneckChanged } = delta
-
-  return (
-    <div className="rounded-xl border border-slate-700/40 bg-slate-800/20 p-3 flex flex-col gap-0.5">
-      <div className="text-[9px] uppercase tracking-widest text-slate-500 font-semibold mb-2">
-        Scenario Impact
-      </div>
-      <DeltaRow label="Production" value={delta.production} unit=" tabs" />
-      <DeltaRow label="Throughput" value={delta.throughput} unit="/min" />
-      <DeltaRow label="WIP" value={delta.wip} unit=" units" lowerIsBetter />
-      <DeltaRow label="Avg Utilization" value={delta.overallUtilization} unit="%" />
-
-      {/* Bottleneck change row */}
-      <div className="flex items-center justify-between gap-2 pt-1">
-        <span className="text-[10px] text-slate-400">Bottleneck</span>
-        {bottleneckChanged ? (
-          <span className="text-[10px] font-mono font-bold text-amber-400">
-            {baselineBnId ?? '—'} → {scenarioBnId ?? '—'}
-          </span>
-        ) : (
-          <span className="text-[10px] font-mono font-semibold text-slate-500">
-            unchanged ({baselineBnId ?? '—'})
-          </span>
-        )}
-      </div>
     </div>
   )
 }

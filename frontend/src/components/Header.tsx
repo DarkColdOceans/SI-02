@@ -6,51 +6,53 @@ interface Props {
 function formatTime(minutes: number): string {
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
-  if (h === 0) return `T+${m}m`
-  return `T+${h}h ${m}m`
+  if (h === 0) return `T + ${String(m).padStart(2, '0')} min`
+  return `T + ${h}h ${String(m).padStart(2, '0')} min`
 }
 
 export function Header({ simulationTime, isRunning }: Props) {
   return (
-    <header className="flex items-center justify-between gap-4 px-6 py-4 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md sticky top-0 z-20">
-      {/* Left: brand */}
-      <div className="flex items-center gap-3">
-        <div className="flex flex-col items-center justify-center h-9 w-9 rounded-lg bg-gradient-to-br from-cyan-600 to-blue-700 text-white font-black text-sm shadow-lg shadow-blue-900/40">
-          DT
-        </div>
-        <div>
-          <div className="text-sm font-bold text-slate-100 tracking-tight leading-none">
-            Tablet Manufacturing
-          </div>
-          <div className="text-[10px] text-cyan-400 uppercase tracking-widest font-semibold">
-            Digital Twin
-          </div>
-        </div>
-      </div>
+    <header className="sticky top-0 z-20 border-b border-[#8E1B1B] bg-[#C62828] text-white">
+      <div className="max-w-[1600px] mx-auto px-6 py-3 flex items-center justify-between gap-4">
 
-      {/* Centre: sim time clock */}
-      <div className="hidden sm:flex items-center gap-2 rounded-full border border-slate-700/60 bg-slate-900/60 px-4 py-1.5">
-        <div className={`h-1.5 w-1.5 rounded-full ${isRunning ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
-        <span className="text-xs font-mono font-semibold text-slate-300">
-          {formatTime(simulationTime)}
-        </span>
-        <span className="text-[9px] text-slate-600 uppercase tracking-widest">
-          {isRunning ? 'LIVE' : 'PAUSED'}
-        </span>
-      </div>
+        {/* Left: brand */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex-shrink-0 h-8 w-8 rounded bg-white flex items-center justify-center">
+            <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-[#C62828]">
+              <path d="M10 2a1 1 0 00-1 1v1H5a2 2 0 00-2 2v2H2a1 1 0 000 2h1v2a2 2 0 002 2h1v1a1 1 0 002 0v-1h4v1a1 1 0 002 0v-1h1a2 2 0 002-2v-2h1a1 1 0 000-2h-1V6a2 2 0 00-2-2h-4V3a1 1 0 00-1-1z" />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] font-semibold text-white/80 uppercase tracking-[0.2em] leading-none">
+              Smart Industry — Digital Twin
+            </div>
+            <div className="text-sm font-bold text-white leading-tight mt-0.5 truncate">
+              Tablet Production Line · Bottleneck Intelligence
+            </div>
+          </div>
+        </div>
 
-      {/* Right: status chips */}
-      <div className="flex items-center gap-2">
-        <div className="text-[9px] uppercase tracking-widest text-slate-600 hidden md:block">
-          6 machines · 5 buffers
+        {/* Right: clock + status */}
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="hidden sm:flex items-center gap-2.5 rounded border border-white/20 bg-black/10 px-3 py-1.5">
+            <div className={`h-2 w-2 rounded-full flex-shrink-0 ${isRunning ? 'bg-white animate-pulse' : 'bg-white/40'}`} />
+            <span className="text-xs font-mono font-semibold text-white tabular-nums">
+              {formatTime(simulationTime)}
+            </span>
+            <span className={`text-[9px] font-bold uppercase tracking-widest ${isRunning ? 'text-white' : 'text-white/60'}`}>
+              {isRunning ? 'LIVE' : 'PAUSED'}
+            </span>
+          </div>
+
+          <div className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded border ${
+            isRunning
+              ? 'border-white bg-white text-[#C62828]'
+              : 'border-white/20 bg-black/10 text-white/70'
+          }`}>
+            {isRunning ? '● Live' : '○ Idle'}
+          </div>
         </div>
-        <div className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest border ${
-          isRunning
-            ? 'border-emerald-500/50 bg-emerald-950/50 text-emerald-400'
-            : 'border-slate-700 bg-slate-900 text-slate-500'
-        }`}>
-          {isRunning ? '● Live' : '○ Idle'}
-        </div>
+
       </div>
     </header>
   )

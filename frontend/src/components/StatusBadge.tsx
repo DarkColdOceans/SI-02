@@ -4,47 +4,65 @@ interface Props {
   status: MachineStatus
 }
 
-const STATUS_CONFIG: Record<MachineStatus, { label: string; classes: string; dot: string }> = {
+/**
+ * Semantic color system (Light Theme adapted):
+ *   RUNNING   → green
+ *   IDLE      → amber/yellow
+ *   STARVED   → blue
+ *   BLOCKED   → orange
+ *   DOWN      → red
+ *   BOTTLENECK → deep red (stronger than normal statuses)
+ */
+const STATUS_CONFIG: Record<
+  MachineStatus,
+  { label: string; bg: string; text: string; dotClass: string }
+> = {
   RUNNING: {
     label: 'RUNNING',
-    classes: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
-    dot: 'bg-emerald-400 animate-pulse',
+    bg: 'bg-emerald-50',
+    text: 'text-emerald-700',
+    dotClass: 'bg-emerald-500 animate-dot-slow',
   },
   IDLE: {
     label: 'IDLE',
-    classes: 'bg-slate-500/20 text-slate-400 border-slate-500/40',
-    dot: 'bg-slate-500',
+    bg: 'bg-amber-50',
+    text: 'text-amber-700',
+    dotClass: 'bg-amber-500',
   },
   STARVED: {
     label: 'STARVED',
-    classes: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-    dot: 'bg-amber-400 animate-pulse',
+    bg: 'bg-blue-50',
+    text: 'text-blue-700',
+    dotClass: 'bg-blue-500 animate-dot-slow',
   },
   BLOCKED: {
     label: 'BLOCKED',
-    classes: 'bg-orange-500/20 text-orange-300 border-orange-500/40',
-    dot: 'bg-orange-400 animate-pulse',
+    bg: 'bg-orange-50',
+    text: 'text-orange-700',
+    dotClass: 'bg-orange-500 animate-dot-slow',
   },
   DOWN: {
     label: 'DOWN',
-    classes: 'bg-red-500/20 text-red-300 border-red-500/40',
-    dot: 'bg-red-500 animate-pulse',
+    bg: 'bg-red-50',
+    text: 'text-red-700',
+    dotClass: 'bg-red-500 animate-dot-slow',
   },
   BOTTLENECK: {
     label: 'BOTTLENECK',
-    classes: 'bg-violet-500/20 text-violet-300 border-violet-500/40',
-    dot: 'bg-violet-400 animate-pulse',
+    bg: 'bg-red-50 border border-red-200',
+    text: 'text-[#C62828]',
+    dotClass: 'bg-[#C62828] animate-dot-slow',
   },
 }
 
 export function StatusBadge({ status }: Props) {
-  const config = STATUS_CONFIG[status]
+  const cfg = STATUS_CONFIG[status]
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest ${config.classes}`}
+      className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest ${cfg.bg} ${cfg.text}`}
     >
-      <span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />
-      {config.label}
+      <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${cfg.dotClass}`} />
+      {cfg.label}
     </span>
   )
 }

@@ -8,47 +8,41 @@ interface Props {
 
 interface KpiItem {
   label: string
-  value: string | number
-  unit?: string
-  color: string
+  value: string
+  sub: string
+  borderColor: string
 }
 
 export function KpiBar({ factoryState, overallUtilization }: Props) {
   const kpis: KpiItem[] = [
     {
-      label: 'Sim Time',
-      value: `T+${factoryState.simulationTime}`,
-      unit: 'min',
-      color: 'text-cyan-400',
+      label: 'Total Production',
+      value: factoryState.totalProduction.toLocaleString(),
+      sub: 'tablets',
+      borderColor: 'border-l-[#C62828]',
     },
     {
       label: 'Throughput',
       value: factoryState.throughput.toFixed(0),
-      unit: '/min',
-      color: 'text-emerald-400',
+      sub: 'units / min',
+      borderColor: 'border-l-[#C62828]',
     },
     {
-      label: 'Total Produced',
-      value: factoryState.totalProduction.toLocaleString(),
-      unit: 'tabs',
-      color: 'text-blue-400',
-    },
-    {
-      label: 'WIP',
+      label: 'Work In Progress',
       value: factoryState.wip.toLocaleString(),
-      unit: 'units',
-      color: 'text-amber-400',
+      sub: 'units in buffers',
+      borderColor: 'border-l-[#C62828]',
     },
     {
-      label: 'Overall Util',
+      label: 'Overall Utilization',
       value: `${overallUtilization.toFixed(1)}`,
-      unit: '%',
-      color: overallUtilization >= 80 ? 'text-violet-400' : 'text-slate-300',
+      sub: '% avg across machines',
+      borderColor: 'border-l-[#C62828]',
     },
   ]
 
   return (
-    <div className="grid grid-cols-5 gap-3 w-full">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full">
       {kpis.map((kpi) => (
         <KpiCard key={kpi.label} kpi={kpi} />
       ))}
@@ -66,10 +60,10 @@ function KpiCard({ kpi }: { kpi: KpiItem }) {
       if (el) {
         el.animate(
           [
-            { transform: 'translateY(-4px)', opacity: 0.5 },
+            { transform: 'translateY(-3px)', opacity: 0.4 },
             { transform: 'translateY(0)', opacity: 1 },
           ],
-          { duration: 250, easing: 'ease-out' },
+          { duration: 200, easing: 'ease-out' },
         )
       }
       prevValueRef.current = kpi.value
@@ -77,21 +71,19 @@ function KpiCard({ kpi }: { kpi: KpiItem }) {
   }, [kpi.value])
 
   return (
-    <div className="flex flex-col gap-1 rounded-xl border border-slate-700/60 bg-slate-900/60 backdrop-blur-sm p-3">
-      <span className="text-[9px] uppercase tracking-widest text-slate-500 font-medium">
+    <div className={`flex flex-col gap-1 rounded-lg border border-[#E5E5E5] border-l-4 ${kpi.borderColor} bg-white shadow-sm p-4`}>
+      <span className="text-[9px] uppercase tracking-[0.15em] text-[#666666] font-semibold leading-none">
         {kpi.label}
       </span>
-      <div className="flex items-baseline gap-1">
+      <div className="flex items-baseline gap-2 mt-1">
         <span
           ref={valueRef}
-          className={`text-xl font-bold font-mono tabular-nums ${kpi.color}`}
+          className="text-2xl font-bold font-mono tabular-nums leading-none text-[#1F1F1F]"
         >
           {kpi.value}
         </span>
-        {kpi.unit && (
-          <span className="text-[10px] text-slate-500">{kpi.unit}</span>
-        )}
       </div>
+      <span className="text-[10px] text-[#666666] leading-none">{kpi.sub}</span>
     </div>
   )
 }
