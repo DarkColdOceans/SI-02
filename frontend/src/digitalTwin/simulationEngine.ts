@@ -159,7 +159,10 @@ function processMachine(state: FactoryState, id: MachineId): number {
     return 0
   }
 
-  const inputAvailable = id === 'M1' ? Number.POSITIVE_INFINITY : (upstream?.quantity ?? 0)
+  // M1 input: use rawMaterialInputRate if set, otherwise unlimited
+  const inputAvailable = id === 'M1'
+    ? (state.rawMaterialInputRate ?? Number.POSITIVE_INFINITY)
+    : (upstream?.quantity ?? 0)
   const outputSpace = downstream
     ? Math.max(0, downstream.maxCapacity - downstream.quantity)
     : Number.POSITIVE_INFINITY
@@ -169,17 +172,28 @@ function processMachine(state: FactoryState, id: MachineId): number {
   if (upstream && processed > 0) {
     upstream.quantity -= processed
   }
-  if (downstream && processed > 0) {
-    downstream.quantity += processed
+
+  // Apply rejection rate: a fraction of processed material is scrapped
+  const rejected = Math.round(processed * (machine.rejectionRate ?? 0))
+  const goodOutput = processed - rejected
+
+  if (downstream && goodOutput > 0) {
+    downstream.quantity += goodOutput
+  }
+
+  // Track rejected units
+  if (rejected > 0) {
+    if (!state.rejectedUnits) state.rejectedUnits = {}
+    state.rejectedUnits[machine.id] = (state.rejectedUnits[machine.id] ?? 0) + rejected
   }
 
   machine.inputRate = processed
-  machine.outputRate = processed
-  machine.totalProcessed += processed
+  machine.outputRate = goodOutput
+  machine.totalProcessed += goodOutput
   machine.utilization = capacity <= 0 ? 0 : clamp01(processed / capacity)
   machine.status = resolveStatus(id, processed, capacity, inputAvailable, outputSpace)
 
-  return id === 'M6' ? processed : 0
+  return id === 'M6' ? goodOutput : 0
 }
 
 function resolveStatus(
