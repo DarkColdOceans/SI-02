@@ -8,7 +8,7 @@
 
 import { useEffect, useRef } from 'react'
 import type { FactoryState } from '../digitalTwin/types'
-import type { ScenarioSnapshot } from '../digitalTwin/scenarioTypes'
+import type { ScenarioResult, ScenarioSnapshot } from '../digitalTwin/scenarioTypes'
 import { BOUNDS } from '../digitalTwin/scenarioTypes'
 import { useScenario } from '../hooks/useScenario'
 import { MutationCard } from './scenario/MutationCard'
@@ -20,6 +20,7 @@ import { ScenarioSlider } from './scenario/ScenarioSlider'
 interface Props {
   liveState: FactoryState
   liveHistory: FactoryState[]
+  onResult?: (result: ScenarioResult | null) => void
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -112,7 +113,7 @@ function ImpactRow({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function ScenarioPanel({ liveState, liveHistory }: Props) {
+export function ScenarioPanel({ liveState, liveHistory, onResult }: Props) {
   const {
     scenario,
     result,
@@ -140,7 +141,8 @@ export function ScenarioPanel({ liveState, liveHistory }: Props) {
         { duration: 300, easing: 'ease-out', fill: 'forwards' },
       )
     }
-  }, [result])
+    onResult?.(result)
+  }, [result, onResult])
 
   const hasValidationErrors = validationErrors.length > 0
   const mutationErrorIndices = new Set(
@@ -322,7 +324,7 @@ export function ScenarioPanel({ liveState, liveHistory }: Props) {
           </div>
 
           {/* Impact summary */}
-          <div className="rounded border border-[#E5E5E5] bg-[#F7F7F7] p-4">
+          <div className={`rounded border border-[#E5E5E5] bg-[#F7F7F7] p-4 ${result.delta.bottleneckChanged || result.delta.scenarioBnId ? 'scenario-bottleneck-callout' : ''}`}>
             <div className="text-[9px] uppercase tracking-widest text-[#666666] font-semibold mb-3">
               Scenario Impact
             </div>
@@ -336,14 +338,12 @@ export function ScenarioPanel({ liveState, liveHistory }: Props) {
                 <ImpactRow label="Avg Utilization" value={result.delta.overallUtilization} unit="%" />
               </div>
             </div>
-            {result.delta.totalRejected > 0 && (
-              <div className="flex items-center justify-between pt-2 border-t border-[#E5E5E5] mt-2">
+            <div className="flex items-center justify-between pt-2 border-t border-[#E5E5E5] mt-2">
                 <span className="text-[10px] text-[#666666]">Rejected Units</span>
                 <span className="text-[11px] font-mono font-bold text-[#C62828]">
-                  +{result.delta.totalRejected}
+                  {result.delta.totalRejected > 0 ? '+' : ''}{result.delta.totalRejected}
                 </span>
               </div>
-            )}
             {/* Bottleneck change */}
             <div className="flex items-center justify-between pt-2 border-t border-[#E5E5E5] mt-2">
               <span className="text-[9px] uppercase tracking-widest text-[#666666]">Bottleneck Change</span>
@@ -352,8 +352,8 @@ export function ScenarioPanel({ liveState, liveHistory }: Props) {
                   {result.delta.baselineBnId ?? '—'} → {result.delta.scenarioBnId ?? '—'}
                 </span>
               ) : (
-                <span className="text-xs font-mono text-[#666666]">
-                  Unchanged ({result.delta.baselineBnId ?? '—'})
+                <span className="text-xs font-mono font-bold text-[#C62828]">
+                  {result.delta.scenarioBnId ? `ACTIVE — ${result.delta.scenarioBnId}` : 'NONE'}
                 </span>
               )}
             </div>
