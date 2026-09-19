@@ -80,6 +80,7 @@ export function createMachineFromSpec(spec: MachineSpec): Machine {
     utilization: 0,
     queue: 0,
     totalProcessed: 0,
+    rejectionRate: 0,
   }
 }
 
@@ -106,6 +107,7 @@ export function createInitialFactoryState(): FactoryState {
     totalProduction: 0,
     throughput: 0,
     wip: 0,
+    rejectedUnits: {},
   }
 }
 

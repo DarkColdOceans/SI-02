@@ -23,6 +23,8 @@ export interface Machine {
   utilization: number
   queue: number
   totalProcessed: number
+  /** Fraction of processed output rejected (0–1). Default: 0 (no rejection). */
+  rejectionRate: number
 }
 
 export interface LineBuffer {
@@ -40,6 +42,10 @@ export interface FactoryState {
   totalProduction: number
   throughput: number
   wip: number
+  /** Raw-material input rate for M1 (units/min). undefined = unlimited. */
+  rawMaterialInputRate?: number
+  /** Cumulative rejected units per machine ID during simulation. */
+  rejectedUnits: Record<string, number>
 }
 
 export type DigitalTwinState = FactoryState
